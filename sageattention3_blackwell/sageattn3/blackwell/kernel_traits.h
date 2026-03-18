@@ -151,8 +151,11 @@ struct Flash_fwd_kernel_traits {
     using SmemCopyAtomDS = Copy_Atom<UniversalCopy<float>, float>;
 
     using BlkScaledConfig = flash::BlockScaledConfig<SFVectorSize>;
-    using LayoutSF = typename BlkScaledConfig::LayoutSF;
-    using SfAtom = typename BlkScaledConfig::SfAtom;
+    using SfAtom = Layout<Shape<Shape<_16,_4>, Shape<Int<SFVectorSize>, _4>>, Stride<Stride<_16,_4>, Stride<_0, _1>>>;
+    using LayoutSF = decltype(blocked_product(SfAtom{},
+                                  make_layout(
+                                      make_shape(int32_t(0), int32_t(0), int32_t(0), int32_t(0)),
+                                      make_stride(int32_t(0), _1{}, int32_t(0), int32_t(0)))));
     using SmemLayoutAtomSFQ = decltype(BlkScaledConfig::deduce_smem_layoutSFQ(TiledMmaQK{}, TileShape_MNK{}));
     using SmemLayoutAtomSFK = decltype(BlkScaledConfig::deduce_smem_layoutSFKV(TiledMmaQK{}, TileShape_MNK{}));
     using SmemLayoutAtomSFV = decltype(BlkScaledConfig::deduce_smem_layoutSFKV(TiledMmaPV{}, TileShape_MNK{}));

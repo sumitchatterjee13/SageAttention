@@ -108,6 +108,16 @@ if not SKIP_CUDA_BUILD:
         "-DCTA256",
         "-DDQINRMEM",
     ]
+    cxx_flags = ["-O3", "-std=c++17"]
+
+    if os.name == "nt":
+        cxx_flags += ["/Zc:__cplusplus", "/bigobj", "/permissive-"]
+        # Note: /Zc:__cplusplus is intentionally omitted from nvcc -Xcompiler flags.
+        # CUTLASS detects C++ standard via _MSVC_LANG (always correct on MSVC).
+        # Including /Zc:__cplusplus here would make CUtensorMap gain alignas(128),
+        # triggering MSVC error C2719 in auto-generated CUDA kernel stubs.
+        nvcc_flags += ["-Xcompiler=/bigobj", "-Xcompiler=/permissive-"]
+
     include_dirs = [
         repo_dir / "sageattn3",
         cutlass_dir / "include",
@@ -119,7 +129,7 @@ if not SKIP_CUDA_BUILD:
             name="fp4attn_cuda",
             sources=["sageattn3/blackwell/api.cu"],
             extra_compile_args={
-                "cxx": ["-O3", "-std=c++17"],
+                "cxx": cxx_flags,
                 "nvcc": append_nvcc_threads(
                     nvcc_flags + ["-DEXECMODE=0"] + cc_flag
                 ),
@@ -134,7 +144,7 @@ if not SKIP_CUDA_BUILD:
             name="fp4quant_cuda",
             sources=["sageattn3/quantization/fp4_quantization_4d.cu"],
             extra_compile_args={
-                "cxx": ["-O3", "-std=c++17"],
+                "cxx": cxx_flags,
                 "nvcc": append_nvcc_threads(
                     nvcc_flags + ["-DEXECMODE=0"] + cc_flag
                 ),
