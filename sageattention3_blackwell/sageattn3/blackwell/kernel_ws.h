@@ -40,10 +40,14 @@ using namespace cute;
 template <typename Ktraits, bool Is_causal, typename TileScheduler>
 __global__ void __launch_bounds__(Ktraits::kNWarps * cutlass::NumThreadsPerWarp, 1)
     compute_attn_ws(CUTE_GRID_CONSTANT Flash_fwd_params const params,
-                    CUTE_GRID_CONSTANT typename CollectiveMainloopFwd<Ktraits, Is_causal>::Params const mainloop_params,
-                    CUTE_GRID_CONSTANT typename CollectiveEpilogueFwd<Ktraits>::Params const epilogue_params,
+                    typename CollectiveMainloopFwd<Ktraits, Is_causal>::Params const* mainloop_params_ptr,
+                    typename CollectiveEpilogueFwd<Ktraits>::Params const* epilogue_params_ptr,
                     CUTE_GRID_CONSTANT typename TileScheduler::Params const scheduler_params
                     ) {
+    // Dereference device-memory pointers (aligned by cudaMalloc) to avoid
+    // MSVC C2719 which forbids passing alignas(128) structs by value.
+    auto const& mainloop_params = *mainloop_params_ptr;
+    auto const& epilogue_params = *epilogue_params_ptr;
 
     using Element = typename Ktraits::Element;
     using ElementAccum = typename Ktraits::ElementAccum;

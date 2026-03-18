@@ -112,11 +112,15 @@ if not SKIP_CUDA_BUILD:
 
     if os.name == "nt":
         cxx_flags += ["/Zc:__cplusplus", "/bigobj", "/permissive-"]
-        # Note: /Zc:__cplusplus is intentionally omitted from nvcc -Xcompiler flags.
-        # CUTLASS detects C++ standard via _MSVC_LANG (always correct on MSVC).
-        # Including /Zc:__cplusplus here would make CUtensorMap gain alignas(128),
-        # triggering MSVC error C2719 in auto-generated CUDA kernel stubs.
-        nvcc_flags += ["-Xcompiler=/bigobj", "-Xcompiler=/permissive-"]
+        # /Zc:__cplusplus is needed in nvcc -Xcompiler so that CUtensorMap gets
+        # alignas(128), matching the device compiler's struct layout.
+        # MSVC error C2719 (aligned params by value) is avoided because the
+        # kernel takes the TMA-containing params by pointer, not by value.
+        nvcc_flags += [
+            "-Xcompiler=/Zc:__cplusplus",
+            "-Xcompiler=/bigobj",
+            "-Xcompiler=/permissive-",
+        ]
 
     include_dirs = [
         repo_dir / "sageattn3",
@@ -163,7 +167,7 @@ class CachedWheelsCommand(_bdist_wheel):
 
 setup(
     name=PACKAGE_NAME,
-    version="1.0.0",
+    version="1.0.2",
     packages=find_packages(
         exclude=(
             "build",

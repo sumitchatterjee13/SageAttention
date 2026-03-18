@@ -89,10 +89,30 @@ void run_flash_fwd(Flash_fwd_params &params, cudaStream_t stream) {
     dim3 grid_dims = Scheduler::get_grid_dim(scheduler_args, 170);
     dim3 block_dims(ctaSize);
     dim3 cluster_dims(size<0>(ClusterShape{}), size<1>(ClusterShape{}), size<2>(ClusterShape{}));
+    // Allocate mainloop_params and epilogue_params in device memory so the
+    // kernel receives pointers (8-byte aligned) instead of by-value structs.
+    // This avoids MSVC error C2719: alignas(128) CUtensorMap members make
+    // these structs too aligned for by-value kernel parameters on Windows.
+    // cudaMalloc guarantees 256-byte alignment, satisfying TMA hardware.
+    typename CollectiveMainloop::Params* d_mainloop_params;
+    typename CollectiveEpilogue::Params* d_epilogue_params;
+    C10_CUDA_CHECK(cudaMalloc(&d_mainloop_params, sizeof(typename CollectiveMainloop::Params)));
+    C10_CUDA_CHECK(cudaMalloc(&d_epilogue_params, sizeof(typename CollectiveEpilogue::Params)));
+    C10_CUDA_CHECK(cudaMemcpyAsync(d_mainloop_params, &mainloop_params,
+                                    sizeof(typename CollectiveMainloop::Params),
+                                    cudaMemcpyHostToDevice, stream));
+    C10_CUDA_CHECK(cudaMemcpyAsync(d_epilogue_params, &epilogue_params,
+                                    sizeof(typename CollectiveEpilogue::Params),
+                                    cudaMemcpyHostToDevice, stream));
+
     cutlass::ClusterLaunchParams launch_params{grid_dims, block_dims, cluster_dims, smem_size, stream};
-    cutlass::launch_kernel_on_cluster(launch_params, kernel, params, mainloop_params, epilogue_params, scheduler_params);
-    
+    cutlass::launch_kernel_on_cluster(launch_params, kernel, params, d_mainloop_params, d_epilogue_params, scheduler_params);
+
     C10_CUDA_KERNEL_LAUNCH_CHECK();
+
+    // Free device params after kernel completes on stream
+    C10_CUDA_CHECK(cudaFreeAsync(d_mainloop_params, stream));
+    C10_CUDA_CHECK(cudaFreeAsync(d_epilogue_params, stream));
 }
 
 
